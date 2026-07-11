@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; color: #2c3e50; }
+        .add-task {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover { background-color: #2980b9; }
+        .filters { display: flex; gap: 10px; margin-bottom: 20px; }
+        .filters button {
+            flex: 1;
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        .filters button.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .task-list { list-style: none; }
+        .task-item {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+            color: #999;
+        }
+        .task-info { flex: 1; }
+        .task-title { font-weight: bold; font-size: 18px; }
+        .task-description { color: #666; font-size: 14px; margin-top: 5px; }
+        .task-meta { font-size: 12px; color: #999; margin-top: 5px; }
+        .priority-high { color: #e74c3c; }
+        .priority-medium { color: #f39c12; }
+        .priority-low { color: #27ae60; }
+        .task-actions { display: flex; gap: 8px; }
+        .task-actions button {
+            width: auto;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .btn-complete { background: #27ae60; }
+        .btn-delete { background: #e74c3c; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 TaskFlow</h1>
+
+        <div class="add-task">
+            <h2 style="margin-bottom: 15px;">Add New Task</h2>
+            <div class="form-group">
+                <label for="taskTitle">Title *</label>
+                <input type="text" id="taskTitle" placeholder="What needs to be done?">
+            </div>
+            <div class="form-group">
+                <label for="taskDescription">Description</label>
+                <textarea id="taskDescription" rows="3" placeholder="Add details..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="taskPriority">Priority</label>
+                <select id="taskPriority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <button onclick="createTask()">➕ Add Task</button>
+        </div>
+
+        <div class="filters">
+            <button class="active" onclick="setFilter('all')">All</button>
+            <button onclick="setFilter('active')">Active</button>
+            <button onclick="setFilter('completed')">Completed</button>
+        </div>
+
+        <ul class="task-list" id="taskList"></ul>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:2505/api/tasks';
+        let currentFilter = 'all';
+
+        async function loadTasks() {
+            try {
+                let url = API_URL;
+                if (currentFilter !== 'all') {
+                    url += '?status=' + currentFilter;
+                }
+                const response = await fetch(url);
+                const data = await response.json();
+                displayTasks(data.tasks);
+            } catch (error) {
+                console.error('Failed to load tasks:', error);
+                document.getElementById('taskList').innerHTML =
+                    '<li class="empty-state">⚠️ Could not connect to server</li>';
+            }
+        }
+
+        function displayTasks(tasks) {
+            const taskList = document.getElementById('taskList');
+            if (tasks.length === 0) {
+                taskList.innerHTML = '<li class="empty-state">📭 No tasks found</li>';
+                return;
+            }
+            taskList.innerHTML = tasks.map(task => `
+                <li class="task-item ${task.completed ? 'completed' : ''}">
+                    <div class="task-info">
+                        <div class="task-title">${task.title}</div>
+                        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                        <div class="task-meta">
+                            <span class="priority-${task.priority}">● ${task.priority}</span>
+                            · Created: ${new Date(task.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div class="task-actions">
+                        <button class="btn-complete" onclick="toggleTask('${task.id}', ${!task.completed})">
+                            ${task.completed ? '↩️' : '✅'}
+                        </button>
+                        <button class="btn-delete" onclick="deleteTask('${task.id}')">🗑️</button>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        async function createTask() {
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const priority = document.getElementById('taskPriority').value;
+            if (!title.trim()) {
+                alert('Please enter a task title!');
+                return;
+            }
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description, priority })
+                });
+                if (response.ok) {
+                    document.getElementById('taskTitle').value = '';
+                    document.getElementById('taskDescription').value = '';
+                    document.getElementById('taskPriority').value = 'medium';
+                    loadTasks();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Could not connect to server');
+            }
+        }
+
+        async function toggleTask(id, completed) {
+            try {
+                await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed })
+                });
+                loadTasks();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function deleteTask(id) {
+            if (!confirm('Delete this task?')) return;
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                loadTasks();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filters button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            loadTasks();
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>
