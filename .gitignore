@@ -32,3 +32,7 @@ Thumbs.db
 
 # Logs
 *.log
+.terraform/
+.terraform.lock.hcl
+.terraform/
+.terraform.lock.hcl
